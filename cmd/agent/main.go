@@ -4,7 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
-	"fmt"
+	"github.com/spitgranger/personal-network-monitor/internal/checks"
+	"github.com/spitgranger/personal-network-monitor/internal/store"
 	"log"
 	"net/http"
 	"net/url"
@@ -12,8 +13,6 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
-
-	"github.com/spitgranger/personal-network-monitor/internal/checks"
 )
 
 const (
@@ -46,11 +45,14 @@ func main() {
 	}
 	ctx, stopSignal := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stopSignal()
+	if err := store.Migrate(ctx); err != nil {
+		log.Fatalf("Failed to migrate database %v", err)
+	}
 	timeoutCtx, stop := context.WithTimeout(ctx, time.Duration(*timeoutPtr)*time.Millisecond)
 	defer stop()
 	client := &http.Client{}
 	result := checks.CheckHttp(timeoutCtx, client, *urlPtr)
 	if err := json.NewEncoder(os.Stdout).Encode(result); err != nil {
-		fmt.Println("Failed to encode output", err)
+		log.Println("Failed to encode output", err)
 	}
 }
